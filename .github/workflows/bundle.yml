@@ -1,14 +1,16 @@
-name: Bundle to Single HTML
+name: Bundle Project to Single HTML
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -16,13 +18,31 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install dependencies & Build
-        run: |
-          npm ci
-          npx vite-plugin-singlefile build # или команда сборки твоего проекта
+      - name: Install dependencies
+        run: npm install --include=dev
 
-      - name: Upload Artifact
+      - name: Inject SingleFile Plugin & Build
+        run: |
+          npm install --save-dev vite-plugin-singlefile vite
+          
+          # Если vite.config.js или vite.config.ts уже есть, дополняем конфиг или собираем напрямую
+          if [ -f vite.config.js ] || [ -f vite.config.ts ]; then
+            npx vite build
+          else
+            # Создаем временный vite.config.js для сборки в один файл
+            cat << 'EOF' > vite.config.js
+          import { defineConfig } from 'vite'
+          import { viteSingleFile } from 'vite-plugin-singlefile'
+
+          export default defineConfig({
+            plugins: [viteSingleFile()],
+          })
+          EOF
+            npx vite build
+          fi
+
+      - name: Upload Single HTML File as Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: single-page-html
-          path: dist/index.html
+          name: single-html-build
+          path: dist/*.html
