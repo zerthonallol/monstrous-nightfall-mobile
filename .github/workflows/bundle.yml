@@ -24,41 +24,55 @@ jobs:
           npm cache clean --force
           npm install --legacy-peer-deps
 
-      - name: Install SingleFile Plugin & Force Static SPA Build
+      - name: Create index.html & Force Static SPA Build
         run: |
           npm install --save-dev vite-plugin-singlefile --legacy-peer-deps
 
-          # Перезаписываем vite.config.ts, чтобы принудительно убрать SSR/Nitro и включить singlefile
+          # Создаем классический index.html в корне, если его там нет, чтобы Vite не ругался на входную точку
+          if [ ! -f index.html ]; then
+            cat << 'EOF' > index.html
+          <!doctype html>
+          <html lang="en">
+            <head>
+              <meta charset="UTF-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              <title>Game</title>
+            </head>
+            <body>
+              <div id="root"></div>
+              <script type="module" src="/app/client.tsx"></script>
+            </body>
+          </html>
+          EOF
+          fi
+
+          # Перезаписываем vite.config.ts для чистой сборки в один файл
           cat << 'EOF' > vite.config.ts
           import { defineConfig } from 'vite';
           import react from '@vitejs/plugin-react';
           import { viteSingleFile } from 'vite-plugin-singlefile';
-          import tsconfigPaths from 'vite-tsconfig-paths';
 
           export default defineConfig({
             plugins: [
               react(),
-              tsconfigPaths(),
               viteSingleFile()
             ],
             build: {
               target: 'esnext',
-              assetsInlineLimit: 100000000, // Инлайним всё, включая текстуры и модели если они встроены
-              chunkSizeWarningLimit: 2000,
               outDir: 'dist',
               emptyOutDir: true,
             },
           });
           EOF
 
-          # Удаляем конфиги Nitro/TanStack Start, если они мешают чистой статической сборке
+          # Удаляем конфигурации SSR, чтобы сборка шла как чистое SPA
           rm -f app.config.ts nitro.config.ts
 
-          # Запускаем чистый сборщик Vite
+          # Запуск сборки
           npx vite build
 
-          echo "=== Проверяем папку dist ==="
-          ls -la dist || echo "dist не найдена!"
+          echo "=== Содержимое dist ==="
+          ls -la dist || echo "Папка dist пуста!"
 
       - name: Upload Single HTML File as Artifact
         uses: actions/upload-artifact@v4
