@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import type { Ending, EndStats, Game, Hud, Note, TokenColor } from "@/game/Game";
 import type { MenuScene } from "@/game/MenuScene";
+import { GFX, GFX_KEY, defaultGraphics, type Graphics } from "@/game/settings";
+import { TouchControls } from "@/components/game/TouchControls";
 
 export const Route = createFileRoute("/")({
   ssr: false,
@@ -53,7 +55,9 @@ function Page() {
   const game = useRef<Game | null>(null);
   const menu = useRef<MenuScene | null>(null);
   const [screen, setScreen] = useState<"menu" | "play" | "end">("menu");
-  const [panel, setPanel] = useState<"main" | "controls" | "endings">("main");
+  const [panel, setPanel] = useState<"main" | "controls" | "endings" | "graphics">("main");
+  const [gfx, setGfx] = useState<Graphics>("medium");
+  const [isTouch, setIsTouch] = useState(false);
   const [ending, setEnding] = useState<{ e: Ending; s: EndStats } | null>(null);
   const [seen, setSeen] = useState<Ending[]>([]);
   const [hud, setHud] = useState<Hud | null>(null);
@@ -62,6 +66,9 @@ function Page() {
 
   useEffect(() => {
     try { setSeen(JSON.parse(localStorage.getItem(SEEN_KEY) || "[]")); } catch { /* ignore */ }
+    const saved = localStorage.getItem(GFX_KEY) as Graphics | null;
+    setGfx(saved && saved in GFX ? saved : defaultGraphics());
+    setIsTouch(window.matchMedia("(pointer: coarse)").matches || "ontouchstart" in window);
   }, []);
 
   useEffect(() => {
@@ -92,7 +99,7 @@ function Page() {
         });
         setTimeout(() => { game.current?.dispose(); game.current = null; setScreen("end"); }, 50);
       },
-    });
+    }, gfx);
     game.current.lock();
   };
   useEffect(() => () => game.current?.dispose(), []);
@@ -122,10 +129,14 @@ function Page() {
           </div>
           {hud.chase && <div className="absolute inset-0 animate-pulse shadow-[inset_0_0_160px_var(--glow)]" />}
           <div className="absolute left-1/2 top-1/2 h-1 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground/60" />
-          {hud.prompt && <div className="absolute bottom-24 left-0 w-full text-center text-lg"><span className="panel-glass rounded px-3 py-1">[E] {hud.prompt}</span></div>}
+          {hud.prompt && <div className={`absolute left-0 w-full text-center text-lg ${isTouch ? "bottom-40" : "bottom-24"}`}><span className="panel-glass rounded px-3 py-1">{isTouch ? "✋" : "[E]"} {hud.prompt}</span></div>}
           {hud.message && <div className="absolute top-16 left-0 w-full px-6 text-center text-lg">{hud.message}</div>}
-          {hud.paused && <div className="absolute inset-0 grid place-items-center bg-background/60 font-display text-2xl">Кликните, чтобы продолжить</div>}
+          {hud.paused && !isTouch && <div className="absolute inset-0 grid place-items-center bg-background/60 font-display text-2xl">Кликните, чтобы продолжить</div>}
         </div>
+      )}
+
+      {screen === "play" && hud && isTouch && !note && !arcade.open && (
+        <TouchControls game={game} prompt={hud.prompt} flashlight={hud.flashlight} />
       )}
 
       {note && (
@@ -178,15 +189,41 @@ function Page() {
                     <nav className="mt-10">
                       <MenuItem onClick={start} onHover={(v) => menu.current?.setFocus(v)}>Играть</MenuItem>
                       <MenuItem onClick={() => setPanel("controls")}>Управление</MenuItem>
+                      <MenuItem onClick={() => setPanel("graphics")}>Графика: {GFX[gfx].label}</MenuItem>
                       <MenuItem onClick={() => setPanel("endings")}>Концовки {seen.length}/4</MenuItem>
                     </nav>
                   )}
                   {panel === "controls" && (
                     <div className="mt-8 space-y-1 text-lg text-foreground/85">
-                      <p>WASD — идти, Shift — бежать</p>
-                      <p>Мышь — осмотреться, E / клик — действие</p>
-                      <p>F — фонарик</p>
+                      {isTouch ? (<>
+                        <p>Левая часть экрана — джойстик</p>
+                        <p>Правая часть — свайп, чтобы осмотреться</p>
+                        <p>✋ действие · 🏃 бег · 🔦 фонарик</p>
+                      </>) : (<>
+                        <p>WASD — идти, Shift — бежать</p>
+                        <p>Мышь — осмотреться, E / клик — действие</p>
+                        <p>F — фонарик</p>
+                      </>)}
                       <p className="pt-2 text-muted-foreground">Почините 3 щитка и выберитесь через ворота. Свет и шум привлекают Зазывалу.</p>
+                      <MenuItem onClick={() => setPanel("main")}>Назад</MenuItem>
+                    </div>
+                  )}
+                  {panel === "graphics" && (
+                    <div className="mt-8 space-y-3">
+                      {(Object.keys(GFX) as Graphics[]).map((k) => (
+                        <button
+                          key={k}
+                          onClick={() => { setGfx(k); localStorage.setItem(GFX_KEY, k); }}
+                          className={`panel-glass block w-full rounded px-4 py-3 text-left transition-colors ${gfx === k ? "border border-accent text-accent" : "text-foreground/85"}`}
+                        >
+                          <div className="font-display text-lg">{GFX[k].label}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {k === "low" && "Для слабых телефонов: без теней и тумана, меньше дождя"}
+                            {k === "medium" && "Баланс: туман, искры, чёткая картинка"}
+                            {k === "high" && "Тени, сглаживание, плотный дождь, отражения"}
+                          </div>
+                        </button>
+                      ))}
                       <MenuItem onClick={() => setPanel("main")}>Назад</MenuItem>
                     </div>
                   )}
