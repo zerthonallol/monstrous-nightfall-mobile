@@ -206,59 +206,127 @@ export type ItemKind = "battery" | "fuse" | "cog" | "key" | "token" | "note" | "
 
 export function buildItem(kind: ItemKind, color?: string) {
   const g = new THREE.Group();
-  const glow = (c: string, i = 0.6) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: i, metalness: 0.5, roughness: 0.4 });
+  const std = (c: string, o: Partial<THREE.MeshStandardMaterialParameters> = {}) =>
+    new THREE.MeshStandardMaterial({ color: c, metalness: 0.4, roughness: 0.45, ...o });
+  const glow = (c: string, i = 0.6, o: Partial<THREE.MeshStandardMaterialParameters> = {}) =>
+    std(c, { emissive: c, emissiveIntensity: i, ...o });
+  const chrome = std("#d8dcdf", { metalness: 1, roughness: 0.22, emissive: "#333", emissiveIntensity: 0.25 });
+  const mesh = (geo: THREE.BufferGeometry, mat: THREE.Material, p: [number, number, number] = [0, 0, 0], rot?: [number, number, number]) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(...p);
+    if (rot) m.rotation.set(...rot);
+    g.add(m);
+    return m;
+  };
+  const extrude = (shape: THREE.Shape, depth: number, bevel = 0.01) => {
+    const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 2, curveSegments: 16 });
+    geo.center();
+    return geo;
+  };
+
   if (kind === "battery") {
-    const b = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.3, 12), glow("#2a8a3a", 0.5));
-    b.rotation.z = Math.PI / 2;
-    g.add(b);
-    const t = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.04, 8), glow("#dddddd", 0.3));
-    t.rotation.z = Math.PI / 2;
-    t.position.x = 0.17;
-    g.add(t);
+    // D-cell: copper top, black body, green label band, chrome caps
+    const body = new THREE.Group();
+    g.add(body);
+    const add = (geo: THREE.BufferGeometry, mat: THREE.Material, y: number) => { const m = new THREE.Mesh(geo, mat); m.position.y = y; body.add(m); };
+    add(new THREE.CylinderGeometry(0.085, 0.085, 0.2, 24), std("#151515", { roughness: 0.3 }), -0.03);
+    add(new THREE.CylinderGeometry(0.0865, 0.0865, 0.11, 24), glow("#2fb34a", 0.55, { roughness: 0.25 }), 0.0);
+    add(new THREE.CylinderGeometry(0.086, 0.086, 0.07, 24), std("#b8732f", { metalness: 0.9, roughness: 0.3 }), 0.1);
+    add(new THREE.CylinderGeometry(0.083, 0.083, 0.012, 24), chrome, -0.135);
+    add(new THREE.CylinderGeometry(0.083, 0.083, 0.012, 24), chrome, 0.14);
+    add(new THREE.CylinderGeometry(0.03, 0.03, 0.03, 16), chrome, 0.16);
+    // lightning bolt decal
+    const bolt = new THREE.Shape([new THREE.Vector2(0.01, 0.04), new THREE.Vector2(-0.02, 0), new THREE.Vector2(0.0, 0), new THREE.Vector2(-0.01, -0.04), new THREE.Vector2(0.025, 0.008), new THREE.Vector2(0.005, 0.008)]);
+    const b = new THREE.Mesh(new THREE.ShapeGeometry(bolt), new THREE.MeshBasicMaterial({ color: "#fff6a0", toneMapped: false }));
+    b.position.set(0, 0, 0.088);
+    body.add(b);
+    body.rotation.z = Math.PI / 2;
   } else if (kind === "fuse") {
-    const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.3, 12), new THREE.MeshStandardMaterial({ color: "#aee8ff", emissive: "#4ab8ff", emissiveIntensity: 0.8, transparent: true, opacity: 0.7 }));
-    g.add(glass);
-    for (const y of [-0.17, 0.17]) {
-      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.06, 12), glow("#c0c0c0", 0.2));
-      cap.position.y = y;
-      g.add(cap);
+    mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.26, 20, 1, true), new THREE.MeshPhysicalMaterial({ color: "#cdefff", transmission: 0.6, roughness: 0.05, thickness: 0.05, transparent: true, opacity: 0.45, emissive: "#3aa8ff", emissiveIntensity: 0.35, side: THREE.DoubleSide }));
+    // glowing zig-zag filament
+    const pts: THREE.Vector3[] = [];
+    for (let i = 0; i <= 10; i++) pts.push(new THREE.Vector3(i % 2 ? 0.025 : -0.025, -0.11 + i * 0.022, 0));
+    mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.005, 5), new THREE.MeshBasicMaterial({ color: "#ffd27a", toneMapped: false }));
+    for (const y of [-0.155, 0.155]) {
+      mesh(new THREE.CylinderGeometry(0.074, 0.074, 0.06, 20), chrome, [0, y, 0]);
+      mesh(new THREE.TorusGeometry(0.074, 0.008, 6, 20), chrome, [0, y * 0.82, 0], [Math.PI / 2, 0, 0]);
+      mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.04, 12), std("#b8732f", { metalness: 1, roughness: 0.3 }), [0, y * 1.25, 0]);
     }
     g.rotation.z = Math.PI / 2;
   } else if (kind === "cog") {
-    const m = glow("#b06a2a", 0.4);
-    g.add(new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.06, 8, 16), m));
-    for (let i = 0; i < 8; i++) {
-      const t = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, 0.1), m);
-      const a = (i / 8) * Math.PI * 2;
-      t.position.set(Math.cos(a) * 0.25, Math.sin(a) * 0.25, 0);
-      t.rotation.z = a;
-      g.add(t);
+    const teeth = 10, ro = 0.25, ri = 0.2;
+    const sh = new THREE.Shape();
+    for (let i = 0; i < teeth; i++) {
+      const a = (i / teeth) * Math.PI * 2, st = (Math.PI * 2) / teeth;
+      const pts = [[ri, a], [ro, a + st * 0.15], [ro, a + st * 0.45], [ri, a + st * 0.6]];
+      pts.forEach(([r, t], j) => (i === 0 && j === 0 ? sh.moveTo : sh.lineTo).call(sh, Math.cos(t) * r, Math.sin(t) * r));
     }
+    sh.closePath();
+    const hole = new THREE.Path();
+    hole.absarc(0, 0, 0.05, 0, Math.PI * 2, true);
+    sh.holes.push(hole);
+    for (let k = 0; k < 5; k++) {
+      const w = new THREE.Path();
+      const a = (k / 5) * Math.PI * 2;
+      w.absarc(Math.cos(a) * 0.125, Math.sin(a) * 0.125, 0.035, 0, Math.PI * 2, true);
+      sh.holes.push(w);
+    }
+    mesh(extrude(sh, 0.05, 0.008), glow("#b8742e", 0.35, { metalness: 0.95, roughness: 0.35 }));
+    mesh(new THREE.TorusGeometry(0.06, 0.015, 8, 20), chrome);
     g.rotation.x = -Math.PI / 2.5;
   } else if (kind === "key") {
-    const m = glow("#e0b040", 0.6);
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.025, 8, 14), m);
-    ring.position.x = -0.15;
-    g.add(ring);
-    const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.035, 0.035), m);
-    shaft.position.x = 0.07;
-    g.add(shaft);
-    const bit = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.08, 0.035), m);
-    bit.position.set(0.18, -0.05, 0);
-    g.add(bit);
+    const gold = glow("#e3b347", 0.45, { metalness: 1, roughness: 0.25 });
+    const bow = new THREE.Shape();
+    bow.absarc(0, 0, 0.09, 0, Math.PI * 2, false);
+    const h = new THREE.Path();
+    h.absarc(0, 0, 0.045, 0, Math.PI * 2, true);
+    bow.holes.push(h);
+    mesh(extrude(bow, 0.025, 0.006), gold, [-0.17, 0, 0]);
+    mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.3, 12), gold, [0.04, 0, 0], [0, 0, Math.PI / 2]);
+    mesh(new THREE.TorusGeometry(0.024, 0.008, 6, 14), gold, [-0.07, 0, 0], [0, Math.PI / 2, 0]);
+    const bit = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(0.1, 0), new THREE.Vector2(0.1, -0.05), new THREE.Vector2(0.075, -0.05), new THREE.Vector2(0.075, -0.08), new THREE.Vector2(0.045, -0.08), new THREE.Vector2(0.045, -0.05), new THREE.Vector2(0.02, -0.05), new THREE.Vector2(0.02, -0.07), new THREE.Vector2(0, -0.07)]);
+    const bm = mesh(new THREE.ExtrudeGeometry(bit, { depth: 0.02, bevelEnabled: false }), gold, [0.08, -0.01, -0.01]);
+    bm.scale.setScalar(1);
+    // dangling paper tag
+    mesh(new THREE.BoxGeometry(0.07, 0.11, 0.004), std("#d9c9a0", { metalness: 0, roughness: 0.9, emissive: "#443322", emissiveIntensity: 0.4 }), [-0.23, -0.12, 0], [0, 0, 0.3]);
   } else if (kind === "token") {
-    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.025, 20), glow(color ?? "#fff", 0.9));
-    c.rotation.x = Math.PI / 2;
-    g.add(c);
+    const c = color ?? "#ffffff";
+    mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.024, 32), glow(c, 0.7, { metalness: 0.8, roughness: 0.3 }), [0, 0, 0], [Math.PI / 2, 0, 0]);
+    mesh(new THREE.TorusGeometry(0.105, 0.012, 8, 32), chrome);
+    // embossed star on both sides
+    const star = new THREE.Shape();
+    for (let i = 0; i < 10; i++) {
+      const r = i % 2 ? 0.026 : 0.06, a = (i / 10) * Math.PI * 2 + Math.PI / 2;
+      (i ? star.lineTo : star.moveTo).call(star, Math.cos(a) * r, Math.sin(a) * r);
+    }
+    const sg = extrude(star, 0.006, 0.003);
+    const sm = new THREE.MeshBasicMaterial({ color: "#fff4cc", toneMapped: false });
+    mesh(sg, sm, [0, 0, 0.015]);
+    mesh(sg, sm, [0, 0, -0.015]);
   } else if (kind === "note") {
-    const p = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.4), new THREE.MeshStandardMaterial({ map: paperTexture(), emissive: "#554433", emissiveIntensity: 0.4, side: THREE.DoubleSide }));
+    // curled paper with pin
+    const geo = new THREE.PlaneGeometry(0.3, 0.4, 8, 8);
+    const pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i);
+      pos.setZ(i, Math.sin((x / 0.3) * Math.PI) * 0.012 + Math.pow(Math.max(0, y - 0.1), 2) * 0.6);
+    }
+    geo.computeVertexNormals();
+    const p = mesh(geo, new THREE.MeshStandardMaterial({ map: paperTexture(), emissive: "#665544", emissiveIntensity: 0.45, roughness: 0.95, side: THREE.DoubleSide }));
     p.rotation.x = -Math.PI / 2.3;
-    g.add(p);
+    const pin = new THREE.Mesh(new THREE.SphereGeometry(0.018, 10, 8), glow("#d02a2a", 0.6));
+    pin.position.set(0, 0.17, 0.02);
+    p.add(pin);
   } else if (kind === "tape") {
-    const b = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 0.2), glow("#222", 0.2));
-    g.add(b);
-    const l = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.052, 0.08), glow("#e05040", 0.6));
-    g.add(l);
+    const shell = std("#1b1b1d", { roughness: 0.35, emissive: "#111", emissiveIntensity: 0.3 });
+    mesh(new THREE.BoxGeometry(0.32, 0.04, 0.2), shell);
+    mesh(new THREE.BoxGeometry(0.26, 0.042, 0.1), glow("#e05040", 0.55, { metalness: 0, roughness: 0.8 }), [0, 0, -0.02]);
+    mesh(new THREE.BoxGeometry(0.14, 0.044, 0.035), new THREE.MeshPhysicalMaterial({ color: "#332a22", roughness: 0.1, transparent: true, opacity: 0.8 }), [0, 0, -0.02]);
+    for (const x of [-0.055, 0.055]) {
+      mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.046, 16), std("#5a3a1e", { roughness: 0.6 }), [x, 0, -0.02]);
+      mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.048, 6), std("#eeeeee"), [x, 0, -0.02]);
+    }
+    for (const x of [-0.12, 0.12]) mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.046, 8), chrome, [x, 0, 0.08]);
   }
   g.traverse((o) => ((o as THREE.Mesh).castShadow = true));
   return g;
