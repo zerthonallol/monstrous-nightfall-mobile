@@ -1,4 +1,4 @@
-name: Bundle Lovable Project to Single HTML
+name: Bundle TanStack Start Lovable Project to Single HTML
 
 on:
   push:
@@ -13,47 +13,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js (Version 22)
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install dependencies
         run: npm install --include=dev
 
-      - name: Force Fix Vite Config & Build
+      - name: Build and Bundle Project
         run: |
           # Устанавливаем плагин singlefile
           npm install --save-dev vite-plugin-singlefile
 
-          # Полностью перезаписываем vite.config.ts, чтобы он точно собирал всё в один файл и в папку dist
-          cat << 'EOF' > vite.config.ts
-          import { defineConfig } from 'vite';
-          import react from '@vitejs/plugin-react';
-          import { viteSingleFile } from 'vite-plugin-singlefile';
+          # Для TanStack Start стандартный vite build может требовать специфичную команду сборки
+          # Пробуем стандартный билд проекта, который прописан в package.json, либо через vite
+          if grep -q "\"build\"" package.json; then
+            npm run build
+          else
+            npx vite build
+          fi
 
-          export default defineConfig({
-            plugins: [react(), viteSingleFile()],
-            build: {
-              outDir: 'dist',
-              emptyOutDir: true,
-            }
-          });
-          EOF
-
-          # Запускаем сборку
-          npx vite build
-
-          # Проверим, что создалось в проекте после сборки
-          echo "=== Содержимое корня ==="
+          # Выведем список файлов после сборки, чтобы найти куда сохранился результат
+          echo "=== Корневая директория после сборки ==="
           ls -la
-          echo "=== Содержимое dist ==="
-          ls -la dist || echo "Папка dist не найдена!"
-
-      - name: Upload Single HTML File as Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: single-lovable-game
-          path: |
-            dist/*.html
-            *.html
+          find . -maxdepth 3 -not -path '*/.*' -not -path './node_modules*'
