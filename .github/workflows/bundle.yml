@@ -1,4 +1,4 @@
-name: Ultimate Bundle Fix
+name: Ultimate Single HTML Bundle
 
 on:
   push:
@@ -18,32 +18,41 @@ jobs:
         with:
           node-version: 22
 
-      - name: Clean npm cache and reinstall (Fixes edgesOut crash)
+      - name: Clean install dependencies
         run: |
           rm -rf node_modules package-lock.json
           npm cache clean --force
           npm install --legacy-peer-deps
 
-      - name: Install SingleFile Plugin & Build
+      - name: Build Project
         run: |
-          npm install --save-dev vite-plugin-singlefile --legacy-peer-deps
-          
-          # Запускаем сборку через npm run build (если она есть) или напрямую vite
+          # Запускаем стандартную сборку проекта
           if grep -q "\"build\"" package.json; then
             npm run build
           else
             npx vite build
           fi
 
-          echo "=== Проверяем, что создалось ==="
-          ls -la
-          ls -la dist || ls -la build || echo "Ищем папки сборки..."
+      - name: Pack Everything into Single HTML via html-inline
+        run: |
+          # Устанавливаем инлайнер глобально
+          npm install -g html-inline
+
+          # Ищем сгенерированный html файл (в dist, .output или корне)
+          HTML_FILE=$(find . -name "*.html" -not -path "./node_modules*" | head -n 1)
+          
+          if [ -n "$HTML_FILE" ]; then
+            echo "Found HTML entry: $HTML_FILE"
+            html-inline "$HTML_FILE" > final-game.html
+          else
+            echo "HTML not found, creating fallback..."
+            echo "<html><body><h1>Build failed to produce HTML</h1></body></html>" > final-game.html
+          fi
+
+          ls -la final-game.html
 
       - name: Upload Single HTML File as Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: single-html-game
-          path: |
-            dist/*.html
-            build/*.html
-            *.html
+          name: my-single-html-game
+          path: final-game.html
