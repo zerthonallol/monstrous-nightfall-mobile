@@ -1,4 +1,4 @@
-name: Ultimate Single HTML Bundle
+name: Ultimate TanStack SPA Single HTML
 
 on:
   push:
@@ -24,35 +24,44 @@ jobs:
           npm cache clean --force
           npm install --legacy-peer-deps
 
-      - name: Build Project
+      - name: Install SingleFile Plugin & Force Static SPA Build
         run: |
-          # Запускаем стандартную сборку проекта
-          if grep -q "\"build\"" package.json; then
-            npm run build
-          else
-            npx vite build
-          fi
+          npm install --save-dev vite-plugin-singlefile --legacy-peer-deps
 
-      - name: Pack Everything into Single HTML via html-inline
-        run: |
-          # Устанавливаем инлайнер глобально
-          npm install -g html-inline
+          # Перезаписываем vite.config.ts, чтобы принудительно убрать SSR/Nitro и включить singlefile
+          cat << 'EOF' > vite.config.ts
+          import { defineConfig } from 'vite';
+          import react from '@vitejs/plugin-react';
+          import { viteSingleFile } from 'vite-plugin-singlefile';
+          import tsconfigPaths from 'vite-tsconfig-paths';
 
-          # Ищем сгенерированный html файл (в dist, .output или корне)
-          HTML_FILE=$(find . -name "*.html" -not -path "./node_modules*" | head -n 1)
-          
-          if [ -n "$HTML_FILE" ]; then
-            echo "Found HTML entry: $HTML_FILE"
-            html-inline "$HTML_FILE" > final-game.html
-          else
-            echo "HTML not found, creating fallback..."
-            echo "<html><body><h1>Build failed to produce HTML</h1></body></html>" > final-game.html
-          fi
+          export default defineConfig({
+            plugins: [
+              react(),
+              tsconfigPaths(),
+              viteSingleFile()
+            ],
+            build: {
+              target: 'esnext',
+              assetsInlineLimit: 100000000, // Инлайним всё, включая текстуры и модели если они встроены
+              chunkSizeWarningLimit: 2000,
+              outDir: 'dist',
+              emptyOutDir: true,
+            },
+          });
+          EOF
 
-          ls -la final-game.html
+          # Удаляем конфиги Nitro/TanStack Start, если они мешают чистой статической сборке
+          rm -f app.config.ts nitro.config.ts
+
+          # Запускаем чистый сборщик Vite
+          npx vite build
+
+          echo "=== Проверяем папку dist ==="
+          ls -la dist || echo "dist не найдена!"
 
       - name: Upload Single HTML File as Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: my-single-html-game
-          path: final-game.html
+          name: single-html-game
+          path: dist/*.html
