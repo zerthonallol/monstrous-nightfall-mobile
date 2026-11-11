@@ -1,4 +1,4 @@
-name: Bundle Project to Single HTML
+name: Bundle Lovable Project to Single HTML
 
 on:
   push:
@@ -21,28 +21,26 @@ jobs:
       - name: Install dependencies
         run: npm install --include=dev
 
-      - name: Inject SingleFile Plugin & Build
+      - name: Build Single HTML with Vite Plugin
         run: |
-          npm install --save-dev vite-plugin-singlefile vite
-          
-          # Если vite.config.js или vite.config.ts уже есть, дополняем конфиг или собираем напрямую
-          if [ -f vite.config.js ] || [ -f vite.config.ts ]; then
-            npx vite build
-          else
-            # Создаем временный vite.config.js для сборки в один файл
-            cat << 'EOF' > vite.config.js
-          import { defineConfig } from 'vite'
-          import { viteSingleFile } from 'vite-plugin-singlefile'
+          # Устанавливаем плагин для упаковки всего в один файл
+          npm install --save-dev vite-plugin-singlefile
 
-          export default defineConfig({
-            plugins: [viteSingleFile()],
-          })
-          EOF
-            npx vite build
+          # Проверяем наличие vite.config.ts / vite.config.js и добавляем плагин в конфиг, если его там нет
+          if [ -f vite.config.ts ]; then
+            CONFIG_FILE="vite.config.ts"
+          elif [ -f vite.config.js ]; then
+            CONFIG_FILE="vite.config.js"
+          else
+            CONFIG_FILE="vite.config.ts"
+            echo "import { defineConfig } from 'vite'; import react from '@vitejs/plugin-react'; import { viteSingleFile } from 'vite-plugin-singlefile'; export default defineConfig({ plugins: [react(), viteSingleFile()] });" > $CONFIG_FILE
           fi
+
+          # Запускаем сборку проекта
+          npx vite build
 
       - name: Upload Single HTML File as Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: single-html-build
+          name: single-lovable-game
           path: dist/*.html
