@@ -24,13 +24,25 @@ jobs:
           npm cache clean --force
           npm install --legacy-peer-deps
 
-      - name: Create index.html & Force Static SPA Build
+      - name: Auto-detect Entry Point & Build Single HTML
         run: |
           npm install --save-dev vite-plugin-singlefile --legacy-peer-deps
 
-          # Создаем классический index.html в корне, если его там нет, чтобы Vite не ругался на входную точку
-          if [ ! -f index.html ]; then
-            cat << 'EOF' > index.html
+          # Ищем реальный файл клиента в проекте (client.tsx, main.tsx, index.tsx и т.д.)
+          ENTRY_FILE=$(find src app -name "client.tsx" -o -name "main.tsx" -o -name "index.tsx" 2>/dev/null | head -n 1)
+          
+          if [ -z "$ENTRY_FILE" ]; then
+            # Если не нашли в src/app, ищем вообще любой .tsx/.ts в корне или папках
+            ENTRY_FILE=$(find . -maxdepth 3 -name "*.tsx" -not -path "./node_modules*" | head -n 1)
+          fi
+
+          echo "Найден файл точки входа: $ENTRY_FILE"
+
+          # Убираем ведущую точку, если она есть (например ./src/client.tsx -> /src/client.tsx)
+          ENTRY_FILE_CLEAN=$(echo "$ENTRY_FILE" | sed 's/^\./\./')
+
+          # Создаем корректный index.html с найденным файлом
+          cat << EOF > index.html
           <!doctype html>
           <html lang="en">
             <head>
@@ -40,13 +52,12 @@ jobs:
             </head>
             <body>
               <div id="root"></div>
-              <script type="module" src="/app/client.tsx"></script>
+              <script type="module" src="$ENTRY_FILE_CLEAN"></script>
             </body>
           </html>
           EOF
-          fi
 
-          # Перезаписываем vite.config.ts для чистой сборки в один файл
+          # Перезаписываем vite.config.ts
           cat << 'EOF' > vite.config.ts
           import { defineConfig } from 'vite';
           import react from '@vitejs/plugin-react';
@@ -65,10 +76,10 @@ jobs:
           });
           EOF
 
-          # Удаляем конфигурации SSR, чтобы сборка шла как чистое SPA
+          # Удаляем конфиги SSR
           rm -f app.config.ts nitro.config.ts
 
-          # Запуск сборки
+          # Сборка
           npx vite build
 
           echo "=== Содержимое dist ==="
