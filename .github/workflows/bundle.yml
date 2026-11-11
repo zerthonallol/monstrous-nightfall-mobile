@@ -1,0 +1,28 @@
+name: Bundle to Single HTML
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies & Build
+        run: |
+          npm ci
+          npx vite-plugin-singlefile build # или команда сборки твоего проекта
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: single-page-html
+          path: dist/index.html
