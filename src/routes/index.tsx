@@ -120,7 +120,7 @@ function Page() {
       <div ref={box} className="absolute inset-0" />
 
       {screen === "play" && hud && (
-        <div className="pointer-events-none absolute inset-0 p-5 text-sm tracking-wide">
+        <div className="pointer-events-none absolute inset-0 p-3 text-xs tracking-wide md:p-5 md:text-sm">
           <div className="panel-glass inline-flex flex-col gap-2 rounded px-4 py-3">
             <Bar label="Фонарик" v={hud.battery} cls="bg-accent" />
             <Bar label="Выносливость" v={hud.stamina} cls="bg-truth" />
@@ -130,7 +130,7 @@ function Page() {
           {hud.chase && <div className="absolute inset-0 animate-pulse shadow-[inset_0_0_160px_var(--glow)]" />}
           <div className="absolute left-1/2 top-1/2 h-1 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground/60" />
           {hud.prompt && <div className={`absolute left-0 w-full text-center text-lg ${isTouch ? "bottom-40" : "bottom-24"}`}><span className="panel-glass rounded px-3 py-1">{isTouch ? "✋" : "[E]"} {hud.prompt}</span></div>}
-          {hud.message && <div className="absolute top-16 left-0 w-full px-6 text-center text-lg">{hud.message}</div>}
+          {hud.message && <div className="absolute top-28 left-0 w-full px-6 text-center text-sm md:top-16 md:text-lg">{hud.message}</div>}
           {hud.paused && !isTouch && <div className="absolute inset-0 grid place-items-center bg-background/60 font-display text-2xl">Кликните, чтобы продолжить</div>}
         </div>
       )}
