@@ -1,4 +1,4 @@
-name: Bundle TanStack Start Lovable Project to Single HTML
+name: Ultimate Bundle Fix
 
 on:
   push:
@@ -18,23 +18,32 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install dependencies
-        run: npm install --include=dev
-
-      - name: Build and Bundle Project
+      - name: Clean npm cache and reinstall (Fixes edgesOut crash)
         run: |
-          # Устанавливаем плагин singlefile
-          npm install --save-dev vite-plugin-singlefile
+          rm -rf node_modules package-lock.json
+          npm cache clean --force
+          npm install --legacy-peer-deps
 
-          # Для TanStack Start стандартный vite build может требовать специфичную команду сборки
-          # Пробуем стандартный билд проекта, который прописан в package.json, либо через vite
+      - name: Install SingleFile Plugin & Build
+        run: |
+          npm install --save-dev vite-plugin-singlefile --legacy-peer-deps
+          
+          # Запускаем сборку через npm run build (если она есть) или напрямую vite
           if grep -q "\"build\"" package.json; then
             npm run build
           else
             npx vite build
           fi
 
-          # Выведем список файлов после сборки, чтобы найти куда сохранился результат
-          echo "=== Корневая директория после сборки ==="
+          echo "=== Проверяем, что создалось ==="
           ls -la
-          find . -maxdepth 3 -not -path '*/.*' -not -path './node_modules*'
+          ls -la dist || ls -la build || echo "Ищем папки сборки..."
+
+      - name: Upload Single HTML File as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: single-html-game
+          path: |
+            dist/*.html
+            build/*.html
+            *.html
