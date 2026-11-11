@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { Sfx } from "./audio";
 import { createNightSky, createRain, Lightning, AdaptiveQuality } from "./atmosphere";
 import { brickTexture, concreteTexture, stripeTexture, signTexture, fogTexture, rustTexture } from "./textures";
+import { GFX, type Graphics, type GfxPreset } from "./settings";
 import { buildBear, buildLocker, buildTable, buildArcade, buildGenerator, buildItem, type Bear, type ItemKind } from "./models";
 
 // Legend: # brick wall, M mirror, . floor, D operator door, H locker, T table (hide),
@@ -157,19 +158,21 @@ export class Game {
   private genLamps: Record<string, THREE.MeshBasicMaterial> = {};
   private decoys: THREE.Group[] = [];
 
-  constructor(container: HTMLElement, cb: GameCallbacks) {
+  private P: GfxPreset;
+  constructor(container: HTMLElement, cb: GameCallbacks, gfx: Graphics = "medium") {
+    this.P = GFX[gfx];
     this.container = container;
     this.cb = cb;
-    this.isTouch = window.matchMedia("(pointer: coarse)").matches;
-    this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance", stencil: false });
-    this.quality = new AdaptiveQuality(this.renderer, Math.min(window.devicePixelRatio, this.isTouch ? 1 : 1.25));
+    this.isTouch = window.matchMedia("(pointer: coarse)").matches || "ontouchstart" in window;
+    this.renderer = new THREE.WebGLRenderer({ antialias: this.P.aa, powerPreference: "high-performance", stencil: false });
+    this.quality = new AdaptiveQuality(this.renderer, Math.min(window.devicePixelRatio, this.P.dpr), Math.min(window.devicePixelRatio, this.P.minDpr));
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.15;
-    this.renderer.shadowMap.enabled = !this.isTouch;
+    this.renderer.shadowMap.enabled = this.P.shadows;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     container.appendChild(this.renderer.domElement);
-    this.camera = new THREE.PerspectiveCamera(72, container.clientWidth / container.clientHeight, 0.05, 260);
+    this.camera = new THREE.PerspectiveCamera(72, container.clientWidth / container.clientHeight, 0.05, this.P.drawDist);
     this.camera.rotation.order = "YXZ";
     this.scene.add(this.camera);
     this.sfx = new Sfx();
@@ -251,7 +254,7 @@ export class Game {
 
     this.sky = createNightSky(220);
     sc.add(this.sky.mesh);
-    this.rain = createRain(this.isTouch ? 2500 : 5000);
+    this.rain = createRain(this.P.rain);
     sc.add(this.rain.mesh);
     this.lightning.thunder = (d, v) => this.sfx.thunder(d, v);
 
@@ -274,7 +277,7 @@ export class Game {
     // walls (instanced per material)
     const brick = new THREE.MeshStandardMaterial({ map: brickTexture(), roughness: 0.95 });
     const stripe = new THREE.MeshStandardMaterial({ map: stripeTexture(), roughness: 0.9 });
-    this.cubeCam = new THREE.CubeCamera(0.1, 60, new THREE.WebGLCubeRenderTarget(this.isTouch ? 64 : 128));
+    this.cubeCam = new THREE.CubeCamera(0.1, 60, new THREE.WebGLCubeRenderTarget(this.P.cube));
     this.cubeCam.position.set(cx(5), 1.7, cx(10));
     sc.add(this.cubeCam);
     const mirror = new THREE.MeshStandardMaterial({ color: "#b8c4c8", metalness: 1, roughness: 0.04, envMap: this.cubeCam.renderTarget.texture, envMapIntensity: 1.6 });
@@ -471,7 +474,7 @@ export class Game {
 
     // ground fog
     const fogTex = fogTexture();
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < (this.P.fogPlanes ? 8 : 0); i++) {
       const fp = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshBasicMaterial({ map: fogTex, transparent: true, opacity: 0.5, depthWrite: false, color: "#8aa0a8" }));
       fp.rotation.x = -Math.PI / 2;
       fp.position.set(rand(10, 62), rand(0.2, 0.7), rand(8, 44));
@@ -536,8 +539,8 @@ export class Game {
     // flashlight
     this.flash = new THREE.SpotLight("#ffe6b8", 60, 30, 0.45, 0.55, 1.4);
     this.flash.position.set(0.25, -0.2, 0);
-    this.flash.castShadow = !this.isTouch;
-    this.flash.shadow.mapSize.set(512, 512);
+    this.flash.castShadow = this.P.shadows;
+    this.flash.shadow.mapSize.set(this.P.shadowMap, this.P.shadowMap);
     this.flash.shadow.bias = -0.0005;
     this.camera.add(this.flash);
     this.flash.target.position.set(0, -0.1, -1);
@@ -1099,7 +1102,7 @@ export class Game {
     // sparks
     this.sparkT -= dt;
     const pos = this.sparks.geometry.getAttribute("position") as THREE.BufferAttribute;
-    if (this.sparkT <= 0 && this.sparkEmitters.length) {
+    if (this.P.sparks && this.sparkT <= 0 && this.sparkEmitters.length) {
       this.sparkT = rand(1.5, 4.5);
       const e = this.sparkEmitters[Math.floor(Math.random() * this.sparkEmitters.length)];
       this.sparkLight.position.copy(e);
@@ -1144,7 +1147,7 @@ export class Game {
     this.cubeT -= dt;
     const nearMaze = Math.hypot(this.pos.x - cx(5), this.pos.z - cx(10)) < 18;
     if (this.cubeT <= 0 && nearMaze) {
-      this.cubeT = 2;
+      this.cubeT = this.P.cubeEvery;
       const flashI = this.flash.intensity;
       this.cubeCam.update(this.renderer, this.scene);
       this.flash.intensity = flashI;
