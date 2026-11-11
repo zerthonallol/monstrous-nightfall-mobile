@@ -28,3 +28,5 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+- Graphics quality presets live in src/game/settings.ts and are passed into the Game constructor; add new quality knobs there so all renderer options stay in one place.
