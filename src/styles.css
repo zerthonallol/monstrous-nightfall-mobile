@@ -30,6 +30,10 @@
  */
 
 @theme inline {
+  --font-display: "Ruslan Display", serif;
+  --font-sans: "Oswald", sans-serif;
+  --color-glow: var(--glow);
+  --color-truth: var(--truth);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -73,26 +77,28 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
+  --radius: 0.25rem;
+  --background: oklch(0.12 0.015 250);
+  --foreground: oklch(0.93 0.02 80);
+  --card: oklch(0.16 0.02 250 / 0.85);
+  --card-foreground: oklch(0.93 0.02 80);
+  --popover: oklch(0.16 0.02 250);
+  --popover-foreground: oklch(0.93 0.02 80);
+  --primary: oklch(0.6 0.22 28);
+  --primary-foreground: oklch(0.98 0.01 80);
+  --secondary: oklch(0.22 0.02 250);
+  --secondary-foreground: oklch(0.93 0.02 80);
+  --muted: oklch(0.22 0.02 250);
+  --muted-foreground: oklch(0.68 0.03 80);
+  --accent: oklch(0.82 0.15 85);
+  --accent-foreground: oklch(0.15 0.02 250);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
+  --border: oklch(0.93 0.02 80 / 0.15);
+  --input: oklch(0.93 0.02 80 / 0.2);
+  --ring: oklch(0.6 0.22 28);
+  --glow: oklch(0.65 0.24 28);
+  --truth: oklch(0.8 0.12 200);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -153,3 +159,65 @@
     color: var(--color-foreground);
   }
 }
+
+@layer components {
+  .menu-stage { perspective: 1100px; }
+  .menu-panel {
+    transform: rotateY(14deg) rotateX(3deg);
+    transform-style: preserve-3d;
+    transition: transform 0.6s cubic-bezier(.2,.8,.2,1);
+  }
+  .menu-item {
+    position: relative;
+    display: block;
+    width: 100%;
+    text-align: left;
+    font-family: var(--font-display);
+    font-size: clamp(1.4rem, 3vw, 2.2rem);
+    letter-spacing: 0.04em;
+    color: var(--muted-foreground);
+    padding: 0.35rem 0 0.35rem 1.4rem;
+    transform: translateZ(0);
+    transition: transform .35s cubic-bezier(.2,.8,.2,1), color .2s, text-shadow .2s;
+  }
+  .menu-item::before {
+    content: "";
+    position: absolute; left: 0; top: 50%;
+    width: 0.55rem; height: 0.55rem; margin-top: -0.28rem;
+    background: var(--glow); border-radius: 999px;
+    box-shadow: 0 0 12px var(--glow);
+    opacity: 0; transform: scale(.3);
+    transition: opacity .2s, transform .2s;
+  }
+  .menu-item:hover, .menu-item:focus-visible {
+    color: var(--foreground);
+    transform: translateZ(60px) translateX(10px);
+    text-shadow: 0 0 18px color-mix(in oklch, var(--glow) 70%, transparent), 0 6px 0 color-mix(in oklch, var(--background) 80%, transparent);
+    outline: none;
+  }
+  .menu-item:hover::before, .menu-item:focus-visible::before { opacity: 1; transform: scale(1); }
+  .title-3d {
+    font-family: var(--font-display);
+    color: var(--foreground);
+    line-height: .95;
+    transform: translateZ(40px);
+    text-shadow:
+      0 1px 0 color-mix(in oklch, var(--primary) 70%, var(--background)),
+      0 2px 0 color-mix(in oklch, var(--primary) 60%, var(--background)),
+      0 3px 0 color-mix(in oklch, var(--primary) 50%, var(--background)),
+      0 4px 0 color-mix(in oklch, var(--primary) 40%, var(--background)),
+      0 5px 0 color-mix(in oklch, var(--primary) 30%, var(--background)),
+      0 8px 22px color-mix(in oklch, var(--background) 90%, transparent),
+      0 0 40px color-mix(in oklch, var(--glow) 45%, transparent);
+    animation: flicker 6s infinite;
+  }
+  .vignette { background: radial-gradient(ellipse at 65% 50%, transparent 30%, color-mix(in oklch, var(--background) 92%, transparent) 100%); }
+  .panel-glass {
+    background: color-mix(in oklch, var(--card) 70%, transparent);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(6px);
+  }
+  .fade-up { animation: fadeUp .8s cubic-bezier(.2,.8,.2,1) both; }
+}
+@keyframes flicker { 0%,92%,100% { opacity: 1 } 93% { opacity: .4 } 94% { opacity: 1 } 96% { opacity: .2 } 97% { opacity: 1 } }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(20px) } to { opacity: 1; transform: none } }
